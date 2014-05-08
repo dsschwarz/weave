@@ -16,7 +16,7 @@ function createNode (x, y) {
 }
 
 function createEdge (n1, n2, type) {
-	type = type || "normal";
+	type = type || "cross"; // cross, parallel, or wall
 	if (!n1 || !n2) {
 		throw new Error("No nodes, no go");
 	}
@@ -147,22 +147,61 @@ function recalculate () {
 	for (var i = 0; i < weave.edges.length; i++) {
 		var e = weave.edges[i];
 		if (!e.q1.external) {
-			makeConnection(e.q1, e, "end", closerCW);
+			makeConnection("q1", e, "end", closerCW);
 		}
 		if (!e.q2.external) {
-			makeConnection(e.q2, e, "start", closerCCW);
+			makeConnection("q2", e, "start", closerCCW);
 		}
 		if (!e.q3.external) {
-			makeConnection(e.q3, e, "start", closerCW);
+			makeConnection("q3", e, "start", closerCW);
 		}
 		if (!e.q4.external) {
-			makeConnection(e.q4, e, "end", closerCCW);
+			makeConnection("q4", e, "end", closerCCW);
+		}
+
+		switch(e.type) {
+			case "cross":
+				e.q1.internal = e.q3;
+				e.q3.internal = e.q1;
+				e.q2.internal = e.q4;
+				e.q4.internal = e.q2;
+			case "parallel":
+				e.q1.internal = e.q4;
+				e.q4.internal = e.q1;
+				e.q2.internal = e.q3;
+				e.q3.internal = e.q2;
+			case "wall":
+				e.q1.internal = e.q2;
+				e.q2.internal = e.q1;
+				e.q3.internal = e.q4;
+				e.q4.internal = e.q3;
+			case default:
+				console.error("Invalid type for edge " + edge);
+
 		}
 	};
 }
 
-function makeConnection (argument) {
-	// body...
+function makeConnection (q, edge, basepoint, compare) {
+	var closestEdge = getClosest(edge, basepoint, compare);
+	var targetQuad;
+	var inSeries = !(closestEdge[basepoint] === edge[basepoint]);
+
+	switch (q) {
+		case "q1":
+			targetQuad = inSeries ? "q2" : "q4";
+		case "q2":
+			targetQuad = inSeries ? "q1" : "q3";
+		case "q3":
+			targetQuad = inSeries ? "q4" : "q2";
+		case "q4":
+			targetQuad = inSeries ? "q3" : "q2";
+		case default:
+			console.warn("param 'q' should be in q1 thru q4");
+	}
+	
+	closestEdge[targetQuad].external = edge[q];
+	edge[q].external = closestEdge[targetQuad];
 }
 
 var _nextId = 0;
