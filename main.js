@@ -71,7 +71,7 @@ function getClosest(refEdge, basepoint, compare) {
 		};
 		if (!closestEdge || compare(eVector, closestVector, refEdge, basepoint)) {
 			closestVector = eVector;
-			closestEdge = refEdge;
+			closestEdge = e;
 		}
 	};
 
@@ -162,22 +162,22 @@ function recalculate (canvas) {
 
 		switch(e.type) {
 			case "cross":
-				e.q1.internal = e.q3;
-				e.q3.internal = e.q1;
-				e.q2.internal = e.q4;
-				e.q4.internal = e.q2;
+				e.q1.internal = {edge: e, quad: "q3"};
+				e.q3.internal = {edge: e, quad: "q1"};
+				e.q2.internal = {edge: e, quad: "q4"};
+				e.q4.internal = {edge: e, quad: "q2"};
 				break;
 			case "parallel":
-				e.q1.internal = e.q4;
-				e.q4.internal = e.q1;
-				e.q2.internal = e.q3;
-				e.q3.internal = e.q2;
+				e.q1.internal = {edge: e, quad: "q4"};
+				e.q4.internal = {edge: e, quad: "q1"};
+				e.q2.internal = {edge: e, quad: "q3"};
+				e.q3.internal = {edge: e, quad: "q2"};
 				break;
 			case "wall":
-				e.q1.internal = e.q2;
-				e.q2.internal = e.q1;
-				e.q3.internal = e.q4;
-				e.q4.internal = e.q3;
+				e.q1.internal = {edge: e, quad: "q2"};
+				e.q2.internal = {edge: e, quad: "q1"};
+				e.q3.internal = {edge: e, quad: "q4"};
+				e.q4.internal = {edge: e, quad: "q3"};
 				break;
 			default:
 				console.error("Invalid type for edge " + e);
@@ -208,6 +208,8 @@ function makeConnection (q, edge, basepoint, compare) {
 		default:
 			console.warn("param 'q' should be in q1 thru q4");
 	}
+
+	console.log("Making connection: " + q + " " + targetQuad + " from edge " + edge.id + " to " + closestEdge.id);
 	
 	closestEdge[targetQuad].external = {edge: edge, quad: q};
 	edge[q].external = {edge: closestEdge, quad: targetQuad};
@@ -265,35 +267,86 @@ function draw (canvas) {
 function drawWeave (ctx, initEdge, quad) {
 	var conn = "external";
 	var oppConn = "internal";
-	var currentQ = initEdge[quad];
+	var currQ = quad; // String
+	var currE = initEdge; // Object
 	var count = 0;
 	do {
+		var cnctn = currE[currQ][conn]; // Edge and quad that the current edge and quadrant is connected to
 		var oppConn = (conn === "external") ? "internal" : "external";
 		if (count > 1000) {
 			console.error("Weave loop too long");
 			return;
 		}
-		var begin = getCoord({edge: initEdge, quad: quad});
-		var control1 = {x: begin.x * 2 - getCoord(quad[oppConn]).x,
-						y: begin.y * 2 - getCoord(quad[oppConn]).y};
-		var end = getCoord(quad[conn]);
-		var control2 = {x: end.x * 2 - getCoord(quad[conn][oppConn]).x,
-						y: end.y * 2 - getCoord(quad[conn][oppConn]).y};
+		var begin = getCoord({edge: currE, quad: currQ});
+		var end = getCoord(currE[currQ][conn]);
+		if (conn === "external") {
+			
 
-		ctx.strokeStyle = "rgba(40,20,20, .7)";
-		ctx.moveTo(begin.x, begin.y);
-		ctx.drawBezierCurve(control1.x, control1.y, control2.x, control2.y, end.x, end.y); // From quad to quad, handle points are opposite other quads on each end
-		currentQ.drawn = true;
-		currentQ = currentQ[conn];
+			var control1 = {x: begin.x * 2 - getCoord( currE[currQ][oppConn]).x,
+							y: begin.y * 2 - getCoord( currE[currQ][oppConn]).y};
+
+			var control2 = {x: end.x * 2 - getCoord( cnctn.edge[cnctn.quad][oppConn]).x,
+							y: end.y * 2 - getCoord( cnctn.edge[cnctn.quad][oppConn]).y};
+
+			ctx.strokeStyle = "rgba(40,20,20, .7)";
+			ctx.beginPath();
+			ctx.moveTo(begin.x, begin.y);
+			ctx.bezierCurveTo(control1.x, control1.y, control2.x, control2.y, end.x, end.y); // From quad to quad, handle points are opposite other quads on each end
+		    ctx.stroke();
+
+		} else {
+			ctx.strokeStyle = "rgba(40,20,20, .7)";
+			ctx.beginPath();
+			ctx.moveTo(begin.x, begin.y);
+			ctx.lineTo(end.x, end.y);
+			ctx.stroke();
+		}
+		currE[currQ].drawn = true;
+
+		currQ = cnctn.quad;
+		currE = cnctn.edge;
 		conn = oppConn;
-	} while (currentQ !== quad);
+	} while (currE !== initEdge || currQ !== quad);
 }
 
 function getCoord (info) {
+	var os = 30; // Quad distance from center of edge
 
 	var e = info.edge; // Object (edge)
 	var quad = info.quad; // String
+	var vector = {x: e.end.x - e.start.x, y: e.end.y - e.start.y};
+	var mag = magnitude(vector);
+	var center = {	x: vector.x / 2 + e.start.x,
+					y: vector.y / 2 + e.start.y
+				}
 
+	var root2 = 1.4142;
+	var matrix;
+	// Rotation matrix is [cos, -sin, sin, cos] <- flattend 2x2 matrix
+	switch (quad) {
+		case "q1":
+			matrix = [1/root2, -1/root2, 1/root2, 1/root2]; // angle = 45
+			break;
+		case "q2":
+			matrix = [-1/root2, -1/root2, 1/root2, -1/root2]; // 135
+			break;
+		case "q3":
+			matrix = [-1/root2, 1/root2, -1/root2, -1/root2]; // 225
+			break;
+		case "q4":
+			matrix = [1/root2, 1/root2, -1/root2, 1/root2]; // 315
+			break;
+		default:
+			console.warn("param 'q' should be in q1 thru q4");
+			return;
+	}
+	var tempV = {x: vector.x / mag * os, y: vector.y / mag * os};
+	var quadOffset = {	x: tempV.x * matrix[0] + tempV.y * matrix[1],
+						y: tempV.x * matrix[2] + tempV.y * matrix[3] }
+
+	return {	x: center.x + quadOffset.x,
+				y: center.y + quadOffset.y
+			}
 }
 
 var _nextId = 0;
@@ -302,9 +355,14 @@ function getId () {
 }
 
 $(document).ready(function() {
-	var n1 = createNode(10, 10);
-	var n2 = createNode(40, 40);
-	var e = createEdge(n1, n2);
+	var n1 = createNode(100, 100);
+	var n2 = createNode(400, 400);
+	var n3 = createNode(100, 400);
+	var n5 = createNode(500, 400);
+	createEdge(n1, n2);
+	createEdge(n3, n2);
+	createEdge(n1, n3);
+	createEdge(n5, n2);
 
 	var canvas = $("#node-canvas").get(0);
 	recalculate(canvas);
