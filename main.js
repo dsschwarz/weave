@@ -294,6 +294,11 @@ function drawWeave (ctx, initEdge, quad) {
 		}
 		var begin = getCoord({edge: currE, quad: currQ});
 		var end = getCoord(currE[currQ][conn]);
+		ctx.strokeStyle = "rgba(40,20,20, 1)";
+		ctx.lineWidth=5;
+		ctx.beginPath();
+		ctx.moveTo(begin.x, begin.y);
+
 		if (conn === "external") {
 			
 
@@ -303,16 +308,10 @@ function drawWeave (ctx, initEdge, quad) {
 			var control2 = {x: end.x * 2 - getCoord( cnctn.edge[cnctn.quad][oppConn]).x,
 							y: end.y * 2 - getCoord( cnctn.edge[cnctn.quad][oppConn]).y};
 
-			ctx.strokeStyle = "rgba(40,20,20, .7)";
-			ctx.beginPath();
-			ctx.moveTo(begin.x, begin.y);
 			ctx.bezierCurveTo(control1.x, control1.y, control2.x, control2.y, end.x, end.y); // From quad to quad, handle points are opposite other quads on each end
 		    ctx.stroke();
 
 		} else {
-			ctx.strokeStyle = "rgba(40,20,20, .7)";
-			ctx.beginPath();
-			ctx.moveTo(begin.x, begin.y);
 			ctx.lineTo(end.x, end.y);
 			ctx.stroke();
 		}
@@ -370,17 +369,24 @@ function getId () {
 }
 
 $(document).ready(function() {
-	var n1 = createNode(100, 100);
-	var n2 = createNode(400, 400);
-	var n3 = createNode(100, 400);
-	var n5 = createNode(500, 600);
-	var n6 = createNode(650, 250);
-	createEdge(n1, n2);
-	createEdge(n3, n2);
-	// createEdge(n1, n3);
+	var n1 = createNode(500, 100);
+	var n2 = createNode(300, 300);
+	var n3 = createNode(500, 300);
+	var n4 = createNode(700, 300);
+	var n5 = createNode(300, 500);
+	var n6 = createNode(500, 500);
+	var n7 = createNode(700, 500);
+	var n8 = createNode(500, 700);
+
+	createEdge(n1, n3);
+	createEdge(n2, n3);
+	createEdge(n3, n4);
+	createEdge(n3, n6);
 	createEdge(n2, n5);
-	createEdge(n1, n6);
-	createEdge(n2, n6);
+	createEdge(n4, n7);
+	createEdge(n5, n6);
+	createEdge(n6, n7);
+	createEdge(n6, n8);
 
 	var canvas = $("#node-canvas").get(0);
 	// draw(canvas);
