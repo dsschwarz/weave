@@ -295,7 +295,7 @@ function drawWeave (ctx, initEdge, quad) {
 		var begin = getCoord({edge: currE, quad: currQ});
 		var end = getCoord(currE[currQ][conn]);
 		ctx.strokeStyle = "rgba(40,20,20, 1)";
-		ctx.lineWidth=5;
+		ctx.lineWidth=20;
 		ctx.beginPath();
 		ctx.moveTo(begin.x, begin.y);
 
@@ -311,7 +311,21 @@ function drawWeave (ctx, initEdge, quad) {
 			ctx.bezierCurveTo(control1.x, control1.y, control2.x, control2.y, end.x, end.y); // From quad to quad, handle points are opposite other quads on each end
 		    ctx.stroke();
 
+			ctx.strokeStyle = "white";
+			ctx.lineWidth=14;
+			ctx.beginPath();
+			ctx.moveTo(begin.x, begin.y);
+			ctx.bezierCurveTo(control1.x, control1.y, control2.x, control2.y, end.x, end.y); // From quad to quad, handle points are opposite other quads on each end
+		    ctx.stroke();
+
 		} else {
+			ctx.lineTo(end.x, end.y);
+			ctx.stroke();
+
+			ctx.strokeStyle = "white";
+			ctx.lineWidth=14;
+			ctx.beginPath();
+			ctx.moveTo(begin.x, begin.y);
 			ctx.lineTo(end.x, end.y);
 			ctx.stroke();
 		}
@@ -388,6 +402,13 @@ $(document).ready(function() {
 	createEdge(n6, n7);
 	createEdge(n6, n8);
 
+	// Triangle
+	var t1 = createNode(600, 50);
+	var t2 = createNode(1000, 50);
+	var t3 = createNode(800, 340);
+	createEdge(t1, t2);
+	createEdge(t1, t3);
+	createEdge(t2, t3);
 	var canvas = $("#node-canvas").get(0);
 	// draw(canvas);
 	debugger;
