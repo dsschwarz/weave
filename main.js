@@ -36,7 +36,6 @@ function createEdge (n1, n2, type) {
 		q3: quad(),
 		q4: quad()
 	}
-	newEdge.q1.edge = newEdge.q2.edge = newEdge.q3.edge = newEdge.q4.edge = newEdge; // Care of cyclic structure here
 	weave.edges.push(newEdge);
 	return newEdge;
 }
@@ -52,11 +51,12 @@ var quad = quadrant;
 // compare is either closerCW or closerCCW
 function getClosest(refEdge, basepoint, compare) {
 	var baseNode = refEdge[basepoint];
-	var oppBasepoint = basepoint = "start" ? "end" : "start";
+	var oppBasepoint = (basepoint === "start") ? "end" : "start";
 
 	var edges = getNodeEdges(baseNode);
 	var closestEdge;
 	var closestVector;
+	if(refEdge.id == 5) debugger;
 	// Edges are either in series or converging/diverging (opposite)
 	for (var i = 0; i < edges.length; i++) {
 		var e = edges[i];
@@ -80,26 +80,27 @@ function getClosest(refEdge, basepoint, compare) {
 }
 
 // a and b are vectors from basepoint of ref edge to a point
+// returns true if a is closer than b tracing ccw from refEdge
 function closerCCW(a, b, referenceEdge, basepoint) {
 	normalize(a);
 	normalize(b);
 	var e = {x: referenceEdge.end.x - referenceEdge.start.x, y: referenceEdge.end.y - referenceEdge.start.y}
-	if (basepoint = "end") {
+	if (basepoint === "end") {
 		e.x *= -1;
 		e.y *= -1;
 	}
 
-	var dirA = (a.x * e.x - a.y * e.x) ? "left" : "right";
-	var dirB = (b.x * e.x - b.y * e.x) ? "left" : "right";
+	var dirA = (a.x * e.y - a.y * e.x > 0) ? "cw" : "ccw"; // Cross product gives direction rotated from refEdge
+	var dirB = (b.x * e.y - b.y * e.x > 0) ? "cw" : "ccw"; // If result is positive, vector is cw of refEdge
 
 	if (dirA !== dirB) {
-		return dirA === "left";
+		return dirA === "ccw";
 	} else {
-		var dotA = (a.x * e.x + a.y * e.y);
-		var dotB = (b.x * e.x + b.y * e.y);
-		if (dirA === "left") {
+		var dotA = (a.x * e.x + a.y * e.y); 
+		var dotB = (b.x * e.x + b.y * e.y); 
+		if (dirA === "ccw") { // Farther ccw you go, more negative dot product becomes
 			return dotA  > dotB;
-		} else {
+		} else { // Increases after 180 degree mark
 			return dotA < dotB
 		}
 	}
@@ -203,7 +204,7 @@ function makeConnection (q, edge, basepoint, compare) {
 			targetQuad = inSeries ? "q4" : "q2";
 			break;
 		case "q4":
-			targetQuad = inSeries ? "q3" : "q2";
+			targetQuad = inSeries ? "q3" : "q1";
 			break;
 		default:
 			console.warn("param 'q' should be in q1 thru q4");
@@ -211,6 +212,10 @@ function makeConnection (q, edge, basepoint, compare) {
 
 	console.log("Making connection: " + q + " " + targetQuad + " from edge " + edge.id + " to " + closestEdge.id);
 	
+	if (closestEdge[targetQuad].external) {
+		console.error("Already connected")
+		debugger;
+	}
 	closestEdge[targetQuad].external = {edge: edge, quad: q};
 	edge[q].external = {edge: closestEdge, quad: targetQuad};
 }
@@ -238,6 +243,16 @@ function draw (canvas) {
 		ctx.moveTo(pt1.x, pt1.y);
 		ctx.lineTo(pt2.x, pt2.y);
 		ctx.stroke();
+
+		ctx.font="30px Verdana";
+		ctx.fillStyle = "red";
+		ctx.fillText("e" + e.id , (pt1.x + pt2.x)/2, (pt1.y + pt2.y)/2);
+
+		var quads = ["q1", "q2", "q3", "q4"];
+		quads.forEach(function(q) {
+			var t = getCoord({edge: e, quad: q});
+			// ctx.fillText(q,t.x, t.y);
+		})
 	}
 
 	for (var i = 0; i < weave.nodes.length; i++) {
@@ -328,10 +343,10 @@ function getCoord (info) {
 			matrix = [1/root2, -1/root2, 1/root2, 1/root2]; // angle = 45
 			break;
 		case "q2":
-			matrix = [-1/root2, -1/root2, 1/root2, -1/root2]; // 135
+			matrix = [-1/root2, -1/root2, 1/root2, -1/root2]; // 225
 			break;
 		case "q3":
-			matrix = [-1/root2, 1/root2, -1/root2, -1/root2]; // 225
+			matrix = [-1/root2, 1/root2, -1/root2, -1/root2]; // 135
 			break;
 		case "q4":
 			matrix = [1/root2, 1/root2, -1/root2, 1/root2]; // 315
@@ -358,13 +373,18 @@ $(document).ready(function() {
 	var n1 = createNode(100, 100);
 	var n2 = createNode(400, 400);
 	var n3 = createNode(100, 400);
-	var n5 = createNode(500, 400);
+	var n5 = createNode(500, 600);
+	var n6 = createNode(650, 250);
 	createEdge(n1, n2);
 	createEdge(n3, n2);
-	createEdge(n1, n3);
-	createEdge(n5, n2);
+	// createEdge(n1, n3);
+	createEdge(n2, n5);
+	createEdge(n1, n6);
+	createEdge(n2, n6);
 
 	var canvas = $("#node-canvas").get(0);
+	// draw(canvas);
+	debugger;
 	recalculate(canvas);
 });
 
