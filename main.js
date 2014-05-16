@@ -336,7 +336,7 @@ function drawWeave (ctx, initEdge, q, conn) {
 	    ctx.stroke();
 
 	} else {
-		if (q == "q1" || q == "q3") {
+		if ((q == "q1" && cnctn.quad == "q3") || (q == "q3" && cnctn.quad == "q1")) {
 			// Draw the other
 			drawWeave(ctx, initEdge, "q2", "internal")
 		}
@@ -579,5 +579,8 @@ function initMouseHandling(canvas) {
 	// start listening
 	$(canvas).mousemove(handler.moved);
 	$(canvas).mousedown(handler.clicked);
+	$(".btnMode").click(function (e) {
+		weave.mode = $(e.target).data('mode');
+	})
 
 }
