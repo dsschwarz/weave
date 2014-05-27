@@ -123,6 +123,8 @@ function getNodeEdges (node) {
 	};
 	return edges;
 }
+
+// TODO - add in crossproduct check to check if intersects on edgeA line segment, not just along infinite line
 function checkIntersect (edgeA, edgeB) {
 	// Center at edgeA start
 	// Check if edgeB endpoints edge on opposite sides of edgeA
@@ -402,39 +404,6 @@ var _nextId = 0;
 function getId () {
 	return _nextId++;
 }
-
-$(document).ready(function() {
-	var n1 = createNode(500, 100);
-	var n2 = createNode(300, 300);
-	var n3 = createNode(500, 300);
-	var n4 = createNode(700, 300);
-	var n5 = createNode(300, 500);
-	var n6 = createNode(500, 500);
-	var n7 = createNode(700, 500);
-	var n8 = createNode(500, 700);
-
-	createEdge(n1, n3);
-	createEdge(n2, n3);
-	createEdge(n3, n4);
-	createEdge(n3, n6);
-	createEdge(n2, n5);
-	createEdge(n4, n7);
-	createEdge(n5, n6);
-	createEdge(n6, n7);
-	createEdge(n6, n8);
-
-	// Triangle
-	var t1 = createNode(600, 50);
-	var t2 = createNode(1000, 50);
-	var t3 = createNode(800, 340);
-	createEdge(t1, t2);
-	createEdge(t1, t3);
-	createEdge(t2, t3);
-	var canvas = $("#node-canvas").get(0);
-	initMouseHandling(canvas);
-	recalculate(canvas);
-});
-
 function getNearestNode (x, y, radius, ignore) {
 	var nearest = null;
 	weave.nodes.forEach(function(n) {
@@ -477,6 +446,9 @@ function initMouseHandling(canvas) {
 		};
 		return false;
 	}
+
+	// TODO - check if edges intersect before allowing placement
+	// Allow cancelation
 	function endDrag (_mouseP) {
 		var secondNearest = getNearestNode(_mouseP.x, _mouseP.y, highlightRadius, [target, startNode]); // Ignore target node or node on other end of edge
 		startNode = null;
@@ -582,5 +554,36 @@ function initMouseHandling(canvas) {
 	$(".btnMode").click(function (e) {
 		weave.mode = $(e.target).data('mode');
 	})
-
 }
+
+$(document).ready(function() {
+	var n1 = createNode(500, 100);
+	var n2 = createNode(300, 300);
+	var n3 = createNode(500, 300);
+	var n4 = createNode(700, 300);
+	var n5 = createNode(300, 500);
+	var n6 = createNode(500, 500);
+	var n7 = createNode(700, 500);
+	var n8 = createNode(500, 700);
+
+	createEdge(n1, n3);
+	createEdge(n2, n3);
+	createEdge(n3, n4);
+	createEdge(n3, n6);
+	createEdge(n2, n5);
+	createEdge(n4, n7);
+	createEdge(n5, n6);
+	createEdge(n6, n7);
+	createEdge(n6, n8);
+
+	// Triangle
+	var t1 = createNode(600, 50);
+	var t2 = createNode(1000, 50);
+	var t3 = createNode(800, 340);
+	createEdge(t1, t2);
+	createEdge(t1, t3);
+	createEdge(t2, t3);
+	var canvas = $("#node-canvas").get(0);
+	initMouseHandling(canvas);
+	recalculate(canvas);
+});
