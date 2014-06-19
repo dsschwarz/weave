@@ -4,7 +4,14 @@ var weave = {
 	lineSegs: [], // Might be optional
 	lines: [],
 	highlightNode: null,
+	offsetX: 0,
+	offsetY: 0,
 	mode: "create"
+}
+
+var _nextId = 0;
+function getId () {
+	return _nextId++;
 }
 
 function createNode (x, y) {
@@ -50,69 +57,7 @@ function quadrant () {
 }
 var quad = quadrant;
 
-// compare is either closerCW or closerCCW
-function getClosest(refEdge, basepoint, compare) {
-	var baseNode = refEdge[basepoint];
-	var oppBasepoint = (basepoint === "start") ? "end" : "start";
 
-	var edges = getNodeEdges(baseNode);
-	var closestEdge;
-	var closestVector;
-	if(refEdge.id == 5) debugger;
-	// Edges are either in series or converging/diverging (opposite)
-	for (var i = 0; i < edges.length; i++) {
-		var e = edges[i];
-		if (e === refEdge) {
-			continue;
-		}
-		var key = e[basepoint] == baseNode ? oppBasepoint : basepoint;
-		// Create a vector from the basenode to the other end of the edge
-		var eVector = {
-			x: e[key].x - baseNode.x,
-			y: e[key].y - baseNode.y
-		};
-		if (!closestEdge || compare(eVector, closestVector, refEdge, basepoint)) {
-			closestVector = eVector;
-			closestEdge = e;
-		}
-	};
-
-	return closestEdge || refEdge; // Return itself if no other edge exists
-
-}
-
-// a and b are vectors from basepoint of ref edge to a point
-// returns true if a is closer than b tracing ccw from refEdge
-function closerCCW(a, b, referenceEdge, basepoint) {
-	normalize(a);
-	normalize(b);
-	var e = {x: referenceEdge.end.x - referenceEdge.start.x, y: referenceEdge.end.y - referenceEdge.start.y}
-	if (basepoint === "end") {
-		e.x *= -1;
-		e.y *= -1;
-	}
-
-	var dirA = (a.x * e.y - a.y * e.x > 0) ? "cw" : "ccw"; // Cross product gives direction rotated from refEdge
-	var dirB = (b.x * e.y - b.y * e.x > 0) ? "cw" : "ccw"; // If result is positive, vector is cw of refEdge
-
-	if (dirA !== dirB) {
-		return dirA === "ccw";
-	} else {
-		var dotA = (a.x * e.x + a.y * e.y); 
-		var dotB = (b.x * e.x + b.y * e.y); 
-		if (dirA === "ccw") { // Farther ccw you go, more negative dot product becomes
-			return dotA  > dotB;
-		} else { // Increases after 180 degree mark
-			return dotA < dotB
-		}
-	}
-
-	console.warn("Why you still here - closerCCW")
-}
-
-function closerCW () {
-	return !closerCCW.apply(this, arguments);
-}
 function getNodeEdges (node) {
 	var edges = [];
 	for (var i = 0; i < weave.edges.length; i++) {
@@ -122,30 +67,6 @@ function getNodeEdges (node) {
 		}
 	};
 	return edges;
-}
-
-// TODO - add in crossproduct check to check if intersects on edgeA line segment, not just along infinite line
-function checkIntersect (edgeA, edgeB) {
-	// Center at edgeA start
-	// Check if edgeB endpoints edge on opposite sides of edgeA
-	var aX = edgeA.end.x - edgeA.start.x;
-	var aY = edgeA.end.y - edgeA.start.y;
-
-	var crossStart = aX * (edgeB.start.y - edgeA.start.y) - aY * (edgeB.start.x - edgeA.start.x);
-	var crossEnd = aX * (edgeB.end.y - edgeA.start.y) - aY * (edgeB.end.x - edgeA.start.x);
-
-	return (crossStart * crossEnd < 0); // true if opposite signs (opposite sides of edgeA)
-}
-
-// In place normalize
-function normalize (vector) {
-	var mag = magnitude(vector);
-	vector.x /= mag;
-	vector.y /= mag;
-}
-
-function magnitude (vector) {
-	return Math.sqrt(vector.x*vector.x + vector.y*vector.y);
 }
 
 // Find all the connections between crossings
@@ -161,16 +82,16 @@ function recalculate (canvas) {
 	for (var i = 0; i < weave.edges.length; i++) {
 		var e = weave.edges[i];
 		if (!e.q1.external) {
-			makeConnection("q1", e, "end", closerCW);
+			makeConnection("q1", e, "end", true);
 		}
 		if (!e.q2.external) {
-			makeConnection("q2", e, "start", closerCCW);
+			makeConnection("q2", e, "start", false);
 		}
 		if (!e.q3.external) {
-			makeConnection("q3", e, "start", closerCW);
+			makeConnection("q3", e, "start", true);
 		}
 		if (!e.q4.external) {
-			makeConnection("q4", e, "end", closerCCW);
+			makeConnection("q4", e, "end", false);
 		}
 
 		switch(e.type) {
@@ -200,8 +121,8 @@ function recalculate (canvas) {
 	draw(canvas);
 }
 
-function makeConnection (q, edge, basepoint, compare) {
-	var closestEdge = getClosest(edge, basepoint, compare);
+function makeConnection (q, edge, basepoint, closestClockwise) {
+	var closestEdge = Utilities.getClosest(edge, basepoint, closestClockwise);
 	var targetQuad;
 	var inSeries = !(closestEdge[basepoint] === edge[basepoint]);
 
@@ -233,10 +154,7 @@ function makeConnection (q, edge, basepoint, compare) {
 }
 function draw (canvas) {
 	var ctx = canvas.getContext("2d");
-	// Use bezier curve between quads
-	// Draw each edge
-	// Draw each node
-	// Draw the weave
+
 	ctx.fillStyle = "white"
 	ctx.fillRect(0,0, canvas.width, canvas.height)
 
@@ -256,13 +174,13 @@ function draw (canvas) {
 		ctx.strokeStyle = "rgba(0,0,0, .333)";
 		ctx.lineWidth = 1;
 		ctx.beginPath();
-		ctx.moveTo(pt1.x, pt1.y);
-		ctx.lineTo(pt2.x, pt2.y);
+		ctx.moveTo(pt1.x + weave.offsetX, pt1.y + weave.offsetY);
+		ctx.lineTo(pt2.x + weave.offsetX, pt2.y + weave.offsetY);
 		ctx.stroke();
 
-		ctx.font="30px Verdana";
-		ctx.fillStyle = "red";
-		ctx.fillText("e" + e.id , (pt1.x + pt2.x)/2, (pt1.y + pt2.y)/2);
+		// ctx.font="30px Verdana";
+		// ctx.fillStyle = "red";
+		// ctx.fillText("e" + e.id , (pt1.x + pt2.x)/2 + weave.offsetX, (pt1.y + pt2.y)/2 + weave.offsetY);
 
 		var quads = ["q1", "q2", "q3", "q4"];
 		quads.forEach(function(q) {
@@ -278,7 +196,7 @@ function draw (canvas) {
 		ctx.fillStyle = "green";
 
         ctx.beginPath();
-		ctx.arc(pt.x,pt.y,5,0,Math.PI*2,true);
+		ctx.arc(pt.x + weave.offsetX,pt.y + weave.offsetY,5,0,Math.PI*2,true);
 
 		ctx.fill();
 	};
@@ -301,7 +219,7 @@ function draw (canvas) {
 		ctx.fillStyle = "orange";
 
         ctx.beginPath();
-		ctx.arc(weave.highlightNode.x,weave.highlightNode.y,5,0,Math.PI*2,true);
+		ctx.arc(weave.highlightNode.x + weave.offsetX, weave.highlightNode.y + weave.offsetY,5,0,Math.PI*2,true);
 
 		ctx.fill();
 	}
@@ -318,7 +236,7 @@ function drawWeave (ctx, initEdge, q, conn) {
 	ctx.strokeStyle = "rgba(40,20,20, 1)";
 	ctx.lineWidth=20;
 	ctx.beginPath();
-	ctx.moveTo(begin.x, begin.y);
+	ctx.moveTo(begin.x + weave.offsetX, begin.y + weave.offsetY);
 
 	if (conn === "external") {
 		var control1 = {x: begin.x * 2 - getCoord( initEdge[q].internal).x,
@@ -327,14 +245,26 @@ function drawWeave (ctx, initEdge, q, conn) {
 		var control2 = {x: end.x * 2 - getCoord( cnctn.edge[cnctn.quad].internal).x,
 						y: end.y * 2 - getCoord( cnctn.edge[cnctn.quad].internal).y};
 
-		ctx.bezierCurveTo(control1.x, control1.y, control2.x, control2.y, end.x, end.y); // From quad to quad, handle points are opposite other quads on each end
+		ctx.bezierCurveTo(
+			control1.x + weave.offsetX,
+			control1.y + weave.offsetY,
+			control2.x + weave.offsetX,
+			control2.y + weave.offsetY,
+			end.x + weave.offsetX,
+			end.y + weave.offsetY);// From quad to quad, handle points are opposite other quads on each end
 	    ctx.stroke();
 
 		ctx.strokeStyle = "white";
 		ctx.lineWidth=14;
 		ctx.beginPath();
-		ctx.moveTo(begin.x, begin.y);
-		ctx.bezierCurveTo(control1.x, control1.y, control2.x, control2.y, end.x, end.y); // From quad to quad, handle points are opposite other quads on each end
+		ctx.moveTo(begin.x + weave.offsetX, begin.y + weave.offsetY);
+		ctx.bezierCurveTo(
+			control1.x + weave.offsetX,
+			control1.y + weave.offsetY,
+			control2.x + weave.offsetX,
+			control2.y + weave.offsetY,
+			end.x + weave.offsetX,
+			end.y + weave.offsetY); // From quad to quad, handle points are opposite other quads on each end
 	    ctx.stroke();
 
 	} else {
@@ -344,29 +274,31 @@ function drawWeave (ctx, initEdge, q, conn) {
 		}
 		ctx.lineWidth=20;
 		ctx.beginPath();
-		ctx.moveTo(begin.x, begin.y);
+		ctx.moveTo(begin.x + weave.offsetX, begin.y + weave.offsetY);
 		ctx.strokeStyle = "rgba(40,20,20, 1)";
-		ctx.lineTo(end.x, end.y);
+		ctx.lineTo(end.x + weave.offsetX, end.y + weave.offsetY);
 		ctx.stroke();
 
 		ctx.strokeStyle = "white";
 		ctx.lineWidth=14;
 		ctx.beginPath();
-		ctx.moveTo(begin.x, begin.y);
-		ctx.lineTo(end.x, end.y);
+		ctx.moveTo(begin.x + weave.offsetX, begin.y + weave.offsetY);
+		ctx.lineTo(end.x + weave.offsetX, end.y + weave.offsetY);
 		ctx.stroke();
 	}
 	initEdge[q][conn].drawn = true;
 	cnctn.edge[cnctn.quad][conn].drawn = true;
 }
 
+// Gets the 'coordinate' of a quadrant (ie a point at a 45 degree angle from the center)
 function getCoord (info) {
 	var os = 30; // Quad distance from center of edge
 
 	var e = info.edge; // Object (edge)
 	var quad = info.quad; // String
-	var vector = {x: e.end.x - e.start.x, y: e.end.y - e.start.y};
-	var mag = magnitude(vector);
+	var vector = Line(e.start, e.end).toVector();
+	var mag = Utilities.magnitude(vector);
+
 	var center = {	x: vector.x / 2 + e.start.x,
 					y: vector.y / 2 + e.start.y
 				}
@@ -400,39 +332,17 @@ function getCoord (info) {
 			}
 }
 
-var _nextId = 0;
-function getId () {
-	return _nextId++;
-}
-function getNearestNode (x, y, radius, ignore) {
-	var nearest = null;
-	weave.nodes.forEach(function(n) {
-		var dist = (n.x-x)*(n.x-x) + (n.y-y)*(n.y-y);
 
-		if (radius && dist > radius * radius) {
-			return;
-		}
-		if (n === ignore || ((ignore instanceof Array) && ($.inArray(n, ignore) !== -1))) {
-			return;
-		}
-
-		if (!nearest) {
-			nearest = n;
-			return;
-		}
-		if((nearest.x - x)*(nearest.x - x) + (nearest.y - y)*(nearest.y - y) > dist) {
-			nearest = n;
-		}
-	});
-	return nearest;
-}
 
 function initMouseHandling(canvas) {
 	// no-nonsense drag and drop (thanks springy.js)
 	var target = null;
 	var startNode = null;
+	var panMode = false;
 	var dragging = false;
+	var panning = false;
 	var highlightRadius = 50;
+	var previousMouseP = {x: 0, y: 0};
 
 	// Returns true if an edge already exists between the same nodes
 	function edgeExists(start, end, edgeArray) {
@@ -450,7 +360,8 @@ function initMouseHandling(canvas) {
 	// TODO - check if edges intersect before allowing placement
 	// Allow cancelation
 	function endDrag (_mouseP) {
-		var secondNearest = getNearestNode(_mouseP.x, _mouseP.y, highlightRadius, [target, startNode]); // Ignore target node or node on other end of edge
+		// Ignore target node or node on other end of edge
+		var secondNearest = Utilities.getNearestNode(weave.nodes, _mouseP.x, _mouseP.y, highlightRadius, [target, startNode]); 
 		startNode = null;
 		if (secondNearest) {
 			var edges = getNodeEdges(target);
@@ -461,7 +372,7 @@ function initMouseHandling(canvas) {
 				} else if (edge.end == target) {
 					edge.end = secondNearest;
 				} else {
-					debugger;
+					console.error("Got edge not connected to target node: #" + edge.id );
 				}
 
 				// Remove bad edges
@@ -478,7 +389,6 @@ function initMouseHandling(canvas) {
 				if (n == target) {
 					arr.splice(i, 1);
 				}
-				return;
 			});
 		}
 		dragging = false;
@@ -490,11 +400,26 @@ function initMouseHandling(canvas) {
 		clicked:function(e){
 
 			var pos = $(canvas).offset();
-			_mouseP = {x: e.pageX-pos.left, y: e.pageY-pos.top};
+			var relativeToCanvas =  {x: e.pageX-pos.left, y: e.pageY-pos.top};
+			var _mouseP = {x: relativeToCanvas.x-weave.offsetX, y: relativeToCanvas.y-weave.offsetY};
 			console.log("Click -" + _mouseP.x + " " + _mouseP.y);
-			if (weave.mode == "erase") {
+			if (panMode && !dragging) {
+				panning = true;
+				previousMouseP = relativeToCanvas;
+			} else if (weave.mode == "erase") {
 				if (target) {
-					// erase node and edges
+					var edges = getNodeEdges(target);
+					edges.forEach(function (edge) {
+						weave.edges.forEach(function (e, i, arr) {
+							if (e == edge) {
+								arr.splice(i, 1);
+							}
+						})
+					});
+					weave.nodes = weave.nodes.filter(function (n, i, arr) {
+						return !(n == target || getNodeEdges(n).length === 0)
+					});
+					recalculate(canvas);
 				}
 			} else if (weave.mode == "create") {
 				if (dragging) {
@@ -527,13 +452,19 @@ function initMouseHandling(canvas) {
 		},
 		moved: function (e) {
 			var pos = $(canvas).offset();
-			_mouseP = {x: e.pageX-pos.left, y: e.pageY-pos.top};
+			var relativeToCanvas =  {x: e.pageX-pos.left, y: e.pageY-pos.top};
+			var _mouseP = {x: relativeToCanvas.x-weave.offsetX, y: relativeToCanvas.y-weave.offsetY};
 			if (dragging) {
 				target.x = _mouseP.x;
 				target.y = _mouseP.y;
-				weave.highlightNode = getNearestNode(_mouseP.x, _mouseP.y, highlightRadius, [target, startNode]);
+				weave.highlightNode = Utilities.getNearestNode(weave.nodes, _mouseP.x, _mouseP.y, highlightRadius, [target, startNode]);
+			} else if (panning) {
+				weave.offsetX += relativeToCanvas.x - previousMouseP.x;
+				weave.offsetY += relativeToCanvas.y - previousMouseP.y;
+				previousMouseP = relativeToCanvas;
 			} else {
-				target = getNearestNode(_mouseP.x, _mouseP.y, highlightRadius);
+				target = Utilities.getNearestNode(weave.nodes, _mouseP.x, _mouseP.y, highlightRadius);
+				Utilities.nearbyEdges(weave.edges, _mouseP.x, _mouseP.y)
 				weave.highlightNode = target;
 			}
 			draw(canvas)
@@ -542,17 +473,37 @@ function initMouseHandling(canvas) {
 			ctx.fillStyle = "purple";
 
 	        ctx.beginPath();
-			ctx.arc(_mouseP.x,_mouseP.y,5,0,Math.PI*2,true);
+			ctx.arc(relativeToCanvas.x,relativeToCanvas.y,5,0,Math.PI*2,true);
 
 			ctx.fill();
+		},
+		onKeyDown: function onKeyDown(e) {
+			if(e.keyCode == 32) {
+				panMode = true;
+			}
+		},
+		
+		onKeyUp: function onKeyUp(e) {
+			if(e.keyCode == 32) {
+				panMode = false;
+			}
+		},
+		
+		mouseup: function mouseup(e) {
+			panning = false;
 		}
 	}
 
 	// start listening
 	$(canvas).mousemove(handler.moved);
 	$(canvas).mousedown(handler.clicked);
+	$(canvas).mouseup(handler.mouseup);
+	$(document).keydown(handler.onKeyDown)
+	$(document).keyup(handler.onKeyUp)
 	$(".btnMode").click(function (e) {
 		weave.mode = $(e.target).data('mode');
+		$(".controls .active").toggleClass("active")
+		$(e.target).toggleClass("active")
 	})
 }
 
